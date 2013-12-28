@@ -2,6 +2,7 @@ import java.net.URL
 
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
+import scala.util.Random
 import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
@@ -22,24 +23,31 @@ object Main {
 	items.foreach(x => (makeTrack(x,trackList)))
 
 	val track = new Track("The Monster","Eminem Featuring Rihanna")
-		val track2 = new Track("Roar","Katy Perry")
+	val track2 = new Track("Roar","Katy Perry")
 
 	//		trackList.foreach(x => println(x))
 	def equalsNotNull(first: Track, second: Track):Boolean = {
 		val opt = Option(first)
-		val opt2 = Option(second)
+				val opt2 = Option(second)
 				return opt.isDefined && opt2.isDefined && first.equals(second) 
 	}
-	println(trackList.filter(x =>  equalsNotNull(x,track2)).mkString(""))
-	println(trackList.indexWhere(x => equalsNotNull(x,track2)))
+	//println(trackList.filter(x =>  equalsNotNull(x,track2)).mkString(""))
+	//println(trackList.indexWhere(x => equalsNotNull(x,track2)))
+	val shuff = Random.shuffle(trackList.toList);
+	compareArrays(trackList, shuff.toArray)
 	}
 
-	def compareArrays(oldTrackList: Array[Track], newTrackList: Array[Track]) {
-	  for(i <- 1 to 101) {
-	    if(newTrackList.indexOf(oldTrackList(i)) != i) {
-	      
-	    }
-	  }
+	def compareArrays(oldTrackList: Array[Track], newTrackList: Array[Track]): List[TrackChange] = {
+		val list: ListBuffer[TrackChange] = new ListBuffer[TrackChange]();
+		//val track = new Track("","") //oldTrackList(i)
+		for(i <- 1 to 100) {
+			val oldTrackIndex = oldTrackList.indexOf(newTrackList(i)) 
+					if( oldTrackIndex != i) {
+						list += new TrackChange(oldTrackIndex, i, oldTrackList(i));
+						println(list.apply(list.size - 1));
+					}
+		}
+		return list.toList
 	}
 
 	private def makeTrack(node: Node,arr: Array[Track]): Track = {
@@ -56,5 +64,17 @@ class Track(title: String, artist: String) {
 	def getArtist = artist;
 	override def toString()  =
 			title + ", " + artist;
-	override def equals(track: Any): Boolean = { return this.artist.equals(track.asInstanceOf[Track].getArtist) && this.title.equals(track.asInstanceOf[Track].getTitle) }
+	override def equals(track: Any): Boolean = { 
+			val opt = Option(track)
+					return opt.isDefined && this.artist.equals(track.asInstanceOf[Track].getArtist) && this.title.equals(track.asInstanceOf[Track].getTitle) 
+	}
+}
+
+case class TrackChange(oldPosition: Int, newPosition: Int,track: Track) {
+//	def getOldPosition = oldPosition;
+//	def getNewPosition = newPosition;
+//	def getTrack = track;
+//	def getPositionChange = oldPosition - newPosition;
+//	override def toString() = 
+//	  "Old: " + oldPosition + " New: " + newPosition + " - " + track;
 }
