@@ -3,43 +3,45 @@ import java.net.URL
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
 import scala.util.Random
-import scala.xml.Elem
 import scala.xml.Node
 import scala.xml.NodeSeq
 import scala.xml.XML
 
+import com.github.sendgrid.SendGrid
+
 object Main {
+    final val toEmail = "jesus.e.luzon@gmail.com"
 	def main(args: Array[String]) {
 		val billboardsURLString : String = "http://www1.billboard.com/rss/charts/hot-100" 
 				val billboardsURL = new URL(billboardsURLString)
 	val xmlString = Source.fromInputStream(billboardsURL.openStream()).getLines().mkString("\n")
 	val xml = XML.load(billboardsURL.openStream())
-	//println( (xml \ "channel").mkString("\n") );
-	//	println((((xml \ "channel") \ "item")).mkString("\n"));
 	val items: NodeSeq = (((xml \ "channel") \ "item"))
-	//val trackList = new ListBuffer[Track]();
-	//	val NodeSeq = NodeSeq(xml); 
+
 	val trackList = new Array[Track](101)
 	items.foreach(x => (makeTrack(x,trackList)))
 
-	val track = new Track("The Monster","Eminem Featuring Rihanna")
-	val track2 = new Track("Roar","Katy Perry")
-
-	//		trackList.foreach(x => println(x))
 	def equalsNotNull(first: Track, second: Track):Boolean = {
 		val opt = Option(first)
 				val opt2 = Option(second)
 				return opt.isDefined && opt2.isDefined && first.equals(second) 
 	}
-	//println(trackList.filter(x =>  equalsNotNull(x,track2)).mkString(""))
-	//println(trackList.indexWhere(x => equalsNotNull(x,track2)))
 	val shuff = Random.shuffle(trackList.toList);
-	compareArrays(trackList, shuff.toArray)
+	val changeList = compareArrays(trackList, shuff.toArray)
+	val stringBuilder = new StringBuilder();
+	changeList.foreach(x => stringBuilder ++= x.track.toString + "\n");
+	val sendGrid = new SendGrid(SendGridCredentials.username,SendGridCredentials.password);
+	sendGrid.addTo(toEmail);
+	sendGrid.setSubject("Billboard Hot 100 changes");
+	sendGrid.setFrom("admin@jluzon.com");
+	sendGrid.setFromName("Jesus Luzon");
+	sendGrid.setText(stringBuilder.toString)
+	sendGrid.send();
+	
 	}
 
 	def compareArrays(oldTrackList: Array[Track], newTrackList: Array[Track]): List[TrackChange] = {
 		val list: ListBuffer[TrackChange] = new ListBuffer[TrackChange]();
-		//val track = new Track("","") //oldTrackList(i)
 		for(i <- 1 to 100) {
 			val oldTrackIndex = oldTrackList.indexOf(newTrackList(i)) 
 					if( oldTrackIndex != i) {
