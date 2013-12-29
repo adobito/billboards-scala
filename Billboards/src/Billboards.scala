@@ -10,46 +10,75 @@ import scala.xml.XML
 import com.github.sendgrid.SendGrid
 
 object Main {
-    final val toEmail = "jesus.e.luzon@gmail.com"
-	def main(args: Array[String]) {
-		val billboardsURLString : String = "http://www1.billboard.com/rss/charts/hot-100" 
-				val billboardsURL = new URL(billboardsURLString)
-	val xmlString = Source.fromInputStream(billboardsURL.openStream()).getLines().mkString("\n")
-	val xml = XML.load(billboardsURL.openStream())
-	val items: NodeSeq = (((xml \ "channel") \ "item"))
-
-	val trackList = new Array[Track](101)
-	items.foreach(x => (makeTrack(x,trackList)))
-
-	def equalsNotNull(first: Track, second: Track):Boolean = {
-		val opt = Option(first)
-				val opt2 = Option(second)
-				return opt.isDefined && opt2.isDefined && first.equals(second) 
+	final val toEmail = "jesus.e.luzon@gmail.com"
+			final val urlString = "http://www1.billboard.com/rss/charts/hot-100"
+			def main(args: Array[String]) {
+		val billboards = new BillboardsHot100(urlString);
+		billboards.checkForChanges();
 	}
-	val shuff = Random.shuffle(trackList.toList);
-	val changeList = compareArrays(trackList, shuff.toArray)
-	val stringBuilder = new StringBuilder();
-	changeList.foreach(x => stringBuilder ++= x.track.toString + "\n");
-	val sendGrid = new SendGrid(SendGridCredentials.username,SendGridCredentials.password);
-	sendGrid.addTo(toEmail);
-	sendGrid.setSubject("Billboard Hot 100 changes");
-	sendGrid.setFrom("admin@jluzon.com");
-	sendGrid.setFromName("Jesus Luzon");
-	sendGrid.setText(stringBuilder.toString)
-	sendGrid.send();
-	
-	}
+}
+class BillboardsHot100(urlString: String) {
+	final val oldTrackList = new Array[Track](101);
+	final val toEmail = "jesus.e.luzon@gmail.com";
+	def checkForChanges() {
 
-	def compareArrays(oldTrackList: Array[Track], newTrackList: Array[Track]): List[TrackChange] = {
-		val list: ListBuffer[TrackChange] = new ListBuffer[TrackChange]();
-		for(i <- 1 to 100) {
-			val oldTrackIndex = oldTrackList.indexOf(newTrackList(i)) 
-					if( oldTrackIndex != i) {
-						list += new TrackChange(oldTrackIndex, i, oldTrackList(i));
-						println(list.apply(list.size - 1));
-					}
-		}
-		return list.toList
+		val trackList = getTrackListFromURLString(urlString);
+
+		var shuff = Random.shuffle(trackList.toList);
+		shuff = shuff.updated(7, new Track("Aloha", "The Hawaiians"));
+
+		val changeList : List[TrackChange] = compareArrays(trackList, shuff.toArray);
+		val stringBuilder = new StringBuilder();
+//		println(changeList.mkString("\n"))
+		changeList.filter(x => x.oldPosition == -1).foreach(x => stringBuilder ++= x.track + "\n" );
+		
+//		println(stringBuilder.toString);
+		sendResults(changeList);
+
+	}
+	def getTrackListFromURLString(url: String): Array[Track] = {
+	  val billboardsURL = new URL(urlString);
+		val xmlString = Source.fromInputStream(billboardsURL.openStream()).getLines().mkString("\n");
+		val xml = XML.load(billboardsURL.openStream());
+		val items: NodeSeq = (((xml \ "channel") \ "item"));
+
+		val trackList = new Array[Track](101);
+		items.foreach(x => (makeTrack(x,trackList)));
+		return trackList;
+	}
+	def sendResults(results: List[TrackChange]) {
+	  val resultsString = filterResults(results).mkString("\n");
+	  val emailList = getEmailList;
+	  val sendGrid = new SendGrid(SendGridCredentials.username,SendGridCredentials.password);
+	 // emailList.foreach(email => sendEmailTo(sendGrid, email, resultsString));	  
+	}
+	def filterResults(changes: List[TrackChange]): List[TrackChange] = {
+	  changes.filter(track => track.oldPosition == -1);
+	}
+	def sendEmailTo(sendGrid: SendGrid, toEmail: String, message: String) {
+	  	sendGrid.addTo(toEmail);
+		sendGrid.setSubject("Billboard Hot 100 Changes");
+		sendGrid.setFrom("admin@jluzon.com");
+		sendGrid.setFromName("Hot 100 Feed");
+		sendGrid.setText(message);
+		sendGrid.send();
+	}
+	def getEmailList : List[String] = {
+	  val emailList = Array(toEmail);
+	  emailList.toList
+	}
+	private def compareArrays(oldTrackList: Array[Track], newTrackList: Array[Track]): List[TrackChange] = {
+			val list: ListBuffer[TrackChange] = new ListBuffer[TrackChange]();
+	//val track = new Track("","") //oldTrackList(i)
+	for(i <- 1 to 100) {
+		val oldTrackIndex = oldTrackList.indexOf(newTrackList(i))
+				
+				if( Option(newTrackList(i)).isDefined &&  oldTrackIndex != i) {
+					list += new TrackChange(oldTrackIndex, i, newTrackList(i));
+					//println(list.last);
+				}
+	}
+	return list.toList
 	}
 
 	private def makeTrack(node: Node,arr: Array[Track]): Track = {
@@ -60,23 +89,19 @@ object Main {
 					return track
 	}
 }
-
-class Track(title: String, artist: String) {
-	def getTitle = title;
-	def getArtist = artist;
+case class Track(title: String, artist: String) {
 	override def toString()  =
 			title + ", " + artist;
 	override def equals(track: Any): Boolean = { 
-			val opt = Option(track)
-					return opt.isDefined && this.artist.equals(track.asInstanceOf[Track].getArtist) && this.title.equals(track.asInstanceOf[Track].getTitle) 
+			Option(track).isDefined && this.artist.equals(track.asInstanceOf[Track].artist) && this.title.equals(track.asInstanceOf[Track].title) 
 	}
 }
 
 case class TrackChange(oldPosition: Int, newPosition: Int,track: Track) {
-//	def getOldPosition = oldPosition;
-//	def getNewPosition = newPosition;
-//	def getTrack = track;
-//	def getPositionChange = oldPosition - newPosition;
-//	override def toString() = 
-//	  "Old: " + oldPosition + " New: " + newPosition + " - " + track;
+	//	def getOldPosition = oldPosition;
+	//	def getNewPosition = newPosition;
+	//	def getTrack = track;
+	//	def getPositionChange = oldPosition - newPosition;
+	override def toString() = 
+			"Old: " + oldPosition + " New: " + newPosition + " - " + track;
 }
