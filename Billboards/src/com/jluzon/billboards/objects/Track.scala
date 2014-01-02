@@ -1,3 +1,5 @@
+package com.jluzon.billboards.objects
+
 case class Track(title: String, artist: String) {
 	override def toString()  =
 			title + ", " + artist;

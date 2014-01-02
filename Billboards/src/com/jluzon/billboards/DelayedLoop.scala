@@ -1,3 +1,5 @@
+package com.jluzon.billboards
+
 import scala.actors._
 
 class DelayedLoop(seconds: Int, callback: () => Unit ) extends Thread {
