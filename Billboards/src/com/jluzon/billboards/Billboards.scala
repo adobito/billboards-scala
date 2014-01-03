@@ -20,15 +20,17 @@ import com.jluzon.billboards.objects.Track
 import com.jluzon.billboards.credentials.SendGridCredentials
 import com.jluzon.billboards.logger.Logger
 import java.io.FileNotFoundException
+import com.jluzon.billboards.objects.PathFinder
 
 
 
 class BillboardsHot100(urlString: String) {
-	val OLD_TRACK_LIST_PATH = "oldTrackList.txt";
+	private val PATH = PathFinder.getPath;
+	val OLD_TRACK_LIST_FILE_NAME = "oldTrackList.txt";
 	val ADMIN_FROM_EMAIL = "admin@jluzon.com";
 	val EMAIL_SUBJECT = "Hot 100 Feed";
 	val EMAIL_SUBJECT_HEADER_PREFIX = "Billboard Hot 100 Changes ";
-	val EMAILS_PATH = "eMails.txt";
+	val EMAILS_FILE_NAME = "eMails.txt";
 	private var oldTrackList: Array[Track] = Array.empty[Track];
 	/**
 	 * Main code operation. Checks RSS Feed for changes in tracks and send to the email
@@ -37,7 +39,7 @@ class BillboardsHot100(urlString: String) {
 
 		val trackList: Array[Track] = getTrackListFromURLString(urlString);;
 		if(oldTrackList.isEmpty) {
-			val file = new File(OLD_TRACK_LIST_PATH)
+			val file = new File(PATH + OLD_TRACK_LIST_FILE_NAME)
 			if(file.exists()) {
 				oldTrackList = deserializeTrackList(file).toArray;
 			}
@@ -47,7 +49,7 @@ class BillboardsHot100(urlString: String) {
 		if(!changeList.isEmpty) {
 			sendResults(filteredChangeList);
 		}
-		val oldTrackListFile = new File(OLD_TRACK_LIST_PATH);
+		val oldTrackListFile = new File(PATH + OLD_TRACK_LIST_FILE_NAME);
 		serializeTrackList(trackList.toList, oldTrackListFile)
 	}
 	/**
@@ -137,7 +139,7 @@ class BillboardsHot100(urlString: String) {
 	 */
 	private def getEmailList(): List[String] = {
 			try {
-				val file = new File(EMAILS_PATH);
+				val file = new File(PATH + EMAILS_FILE_NAME);
 				val in = new Scanner(file);
 				val emailList = new ListBuffer[String]();
 				while(in.hasNextLine()) {
