@@ -36,21 +36,29 @@ class BillboardsHot100(urlString: String) {
 	 * Main code operation. Checks RSS Feed for changes in tracks and send to the email
 	 */
 	def run() {
-
+		Logger.info("Application starting up.")
 		val trackList: Array[Track] = getTrackListFromURLString(urlString);;
 		if(oldTrackList.isEmpty) {
 			val file = new File(PATH + OLD_TRACK_LIST_FILE_NAME)
 			if(file.exists()) {
+				Logger.debug("Old track list found: Attempting to deserialize")
 				oldTrackList = deserializeTrackList(file).toArray;
+				
+			}
+			else {
+			  Logger.debug("Old track list not found.")
 			}
 		}
 		val changeList : List[TrackChange] = compareTrackLists(oldTrackList, trackList);
 		val filteredChangeList = filterResults(changeList);
+		Logger.info("Found " + filteredChangeList.size + " new tracks");
 		if(!changeList.isEmpty) {
 			sendResults(filteredChangeList);
 		}
 		val oldTrackListFile = new File(PATH + OLD_TRACK_LIST_FILE_NAME);
+		Logger.debug("Attempting to Serialize old track list to " + PATH + OLD_TRACK_LIST_FILE_NAME);
 		serializeTrackList(trackList.toList, oldTrackListFile)
+		Logger.info("Application shutting down.");
 	}
 	/**
 	 * Serializes track list and persists it in a JSON text file for next run.
@@ -62,7 +70,7 @@ class BillboardsHot100(urlString: String) {
 			val writer = new PrintWriter(file);
 			writer.write(pickle.value);
 			writer.flush();
-			Logger.info("Serialized " + file.getName() + " successfully.")
+			Logger.debug("Serialized " + file.getName() + " successfully.")
 		}
 		catch {
 			case e: Exception => Logger.error("Could not serialize new track list. \n" + e.getStackTrace().mkString("\n"));
@@ -80,7 +88,9 @@ class BillboardsHot100(urlString: String) {
 					builder.append(reader.nextLine());
 				}
 				val pickle = JSONPickle(builder.toString);
-				pickle.unpickle[List[Track]]; 
+				val trackList = pickle.unpickle[List[Track]]; 
+				Logger.debug(file.getName() + " deserialized succesfully");
+				trackList
 			} catch {
 				case e: Exception =>  { Logger.error(e.getStackTrace().mkString("\n")); List[Track](); }
 			}
@@ -107,25 +117,30 @@ class BillboardsHot100(urlString: String) {
 	 * Turns results into a strings and sends them to e-mail list trough SendGrid.
 	 */
 	private def sendResults(results: List[TrackChange]) {
-		val resultsString = results.mkString("\n");
+		val stringBuilder = new StringBuilder();
+		results.foreach(trackChange => stringBuilder.append(toHtmlLink(
+		        trackChange, YoutubeVideoLinkFinder.getFirstUrlOfSearchTerm(trackChange.track.toString)) + "\n"));
+		val resultsString = stringBuilder.toString(); 
 		val emailList = getEmailList();
-		val sendGrid = new SendGrid(SendGridCredentials.username,SendGridCredentials.password);
-		emailList.foreach(email => sendEmailTo(sendGrid, email, resultsString));
+		emailList.foreach(email => sendEmailTo(email, resultsString));
 	}
 	private def filterResults(changes: List[TrackChange]): List[TrackChange] = {
-			changes.filter(track => track.oldPosition == -1);
+			changes.filter(track => track.oldPosition == (-1));
 	}
 	/**
 	 * Sends email through sendgrid.
 	 */
-	private def sendEmailTo(sendGrid: SendGrid, toEmail: String, message: String) {
+	private def sendEmailTo(toEmail: String, message: String) {
+		val sendGrid = new SendGrid(SendGridCredentials.username,SendGridCredentials.password);
 		sendGrid.addTo(toEmail);
 		sendGrid.setSubject(EMAIL_SUBJECT_HEADER_PREFIX + getCalendarDateString());
 		sendGrid.setFrom(ADMIN_FROM_EMAIL);
 		sendGrid.setFromName(EMAIL_SUBJECT);
-		sendGrid.setText(message);
+		sendGrid.setHtml(message);
 		sendGrid.send();
+		Logger.info("Email to " + toEmail + " sent successfully");
 	}
+	
 	/**
 	 * Gets a calendar date in MM-DD-YYYY format
 	 */
@@ -174,6 +189,9 @@ class BillboardsHot100(urlString: String) {
 		val track: Track = new Track(trackStringArr(1).trim(), trackStringArr(2).trim());
 		arr(trackStringArr(0).toInt) = track;
 		return track;
+	}
+	private def toHtmlLink(trackChange: TrackChange, link: String):String = {
+	  "<a href=\""+ link + "\" target=\"_blank\" style=\"target-new: tab;\">" + trackChange.newPosition + ". " + trackChange.track.toString() + "</a><br>" 
 	}
 }
 
