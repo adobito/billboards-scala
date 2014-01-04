@@ -8,8 +8,8 @@ new popular music was coming out without having to constantly check for this.
 
 	Future Work:
 
-	Improve e-mail layout.
-	Use youtube API to include Youtube link for song.
+	Use Database instead of text files.
+	Add support for Spotify and/or Google Music.
 	Maintain a blog somewhere with the changes.
 	Twitter feed that posts links to said blog.
 
