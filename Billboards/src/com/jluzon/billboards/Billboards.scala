@@ -3,24 +3,26 @@ package com.jluzon.billboards
 import java.io.File
 import java.io.PrintWriter
 import java.net.URL
+import java.text.SimpleDateFormat
 import java.util.Calendar
 import java.util.Date
 import java.util.GregorianCalendar
+import java.util.Locale
 import java.util.Scanner
+
 import scala.collection.mutable.ListBuffer
 import scala.io.Source
-import scala.pickling._
-import scala.pickling.json._
 import scala.xml.Node
 import scala.xml.NodeSeq
 import scala.xml.XML
+
 import com.github.sendgrid.SendGrid
-import com.jluzon.billboards.objects.TrackChange
-import com.jluzon.billboards.objects.Track
 import com.jluzon.billboards.credentials.SendGridCredentials
+import com.jluzon.billboards.jdbc.BillboardsDatabase
 import com.jluzon.billboards.logger.Logger
-import java.io.FileNotFoundException
 import com.jluzon.billboards.objects.PathFinder
+import com.jluzon.billboards.objects.Track
+import com.jluzon.billboards.objects.TrackListing
 
 
 
@@ -37,78 +39,43 @@ class BillboardsHot100(urlString: String) {
 	 */
 	def run() {
 		Logger.info("Application starting up.")
-		val trackList: Array[Track] = getTrackListFromURLString(urlString);;
-		if(oldTrackList.isEmpty) {
-			val file = new File(PATH + OLD_TRACK_LIST_FILE_NAME)
-			if(file.exists()) {
-				Logger.debug("Old track list found: Attempting to deserialize")
-				oldTrackList = deserializeTrackList(file).toArray;
-				
-			}
-			else {
-			  Logger.debug("Old track list not found.")
+		Logger.debug("Getting track list from XML feed.");
+		val currListings: List[TrackListing] = getTrackListFromURLString(urlString);;
+		if(currListings.size != 100) {
+		  Logger.error("Error Obtaining Hot 100 List, Expecting 100 listings, obtained " + currListings.size);
+		}
+		else {
+		  Logger.debug("Obtained track list from XML feed successfully.")
+		}
+		Logger.debug("Checking if new listings found.")
+		val date = BillboardsDatabase.getLatestListingDate()
+		if(!currListings(0).date.equals(BillboardsDatabase.getLatestListingDate())) {
+			Logger.info("Found new listings.")
+			Logger.debug("Getting previous listings for comparison.")
+			val lastListings = BillboardsDatabase.getLastListings();
+			Logger.debug("Obtained previous listings succesfully.")
+			currListings.foreach(x => BillboardsDatabase.addTrackListing(x));
+			val changeList = compareTrackListings(lastListings, currListings);
+			Logger.info("Found " + changeList.size + " new tracks");
+			if(!changeList.isEmpty) {
+				sendResults(changeList);
 			}
 		}
-		val changeList : List[TrackChange] = compareTrackLists(oldTrackList, trackList);
-		val filteredChangeList = filterResults(changeList);
-		Logger.info("Found " + filteredChangeList.size + " new tracks");
-		if(!changeList.isEmpty) {
-			sendResults(filteredChangeList);
-		}
-		val oldTrackListFile = new File(PATH + OLD_TRACK_LIST_FILE_NAME);
-		Logger.debug("Attempting to Serialize old track list to " + PATH + OLD_TRACK_LIST_FILE_NAME);
-		serializeTrackList(trackList.toList, oldTrackListFile)
+		//serializeTrackList(trackList.toList, oldTrackListFile)
 		Logger.info("Application shutting down.");
 	}
 	/**
-	 * Serializes track list and persists it in a JSON text file for next run.
+	 * Gets the XML RSS Feed from the specified String URL and converts it into an Array of TracksListings, in order of position (0 = null)
 	 */
-	private def serializeTrackList(obj: List[Track], file: File) {
-		try {
-			val pickle = obj.pickle;
-			//		println(pickle.toString());
-			val writer = new PrintWriter(file);
-			writer.write(pickle.value);
-			writer.flush();
-			Logger.debug("Serialized " + file.getName() + " successfully.")
-		}
-		catch {
-			case e: Exception => Logger.error("Could not serialize new track list. \n" + e.getStackTrace().mkString("\n"));
-		}
-
-	}
-	/**
-	 * Deserializes old track list stored and turns it back into a List of Tracks, in order.
-	 */
-	private def deserializeTrackList(file: File): List[Track] = {
+	private def getTrackListFromURLString(url: String): List[TrackListing] = {
 			try {
-				val reader: Scanner = new Scanner(file);;
-				val builder = new StringBuilder();
-				while(reader.hasNextLine()) {
-					builder.append(reader.nextLine());
-				}
-				val pickle = JSONPickle(builder.toString);
-				val trackList = pickle.unpickle[List[Track]]; 
-				Logger.debug(file.getName() + " deserialized succesfully");
-				trackList
-			} catch {
-				case e: Exception =>  { Logger.error(e.getStackTrace().mkString("\n")); List[Track](); }
-			}
-
-	}
-
-	/**
-	 * Gets the XML RSS Feed from the specified String URL and converts it into an Array of Tracks, in order of position (0 = null)
-	 */
-	private def getTrackListFromURLString(url: String): Array[Track] = {
-			try {
+				val list = new ListBuffer[TrackListing]();
 				val billboardsURL = new URL(urlString);
 				val xmlString = Source.fromInputStream(billboardsURL.openStream()).getLines().mkString("\n");
 				val xml = XML.load(billboardsURL.openStream());
 				val items: NodeSeq = (((xml \ "channel") \ "item"));
-				val trackList = new Array[Track](101);
-				items.foreach(x => (makeTrack(x,trackList)));
-				return trackList;
+				items.foreach(item => list.append(makeTrackListing(item)));
+				return list.toList;
 			} catch {
 				case e: Exception => {Logger.error(e.getStackTrace().mkString("\n")); null;}
 			}
@@ -116,7 +83,7 @@ class BillboardsHot100(urlString: String) {
 	/*
 	 * Turns results into a strings and sends them to e-mail list trough SendGrid.
 	 */
-	private def sendResults(results: List[TrackChange]) {
+	private def sendResults(results: List[TrackListing]) {
 		val stringBuilder = new StringBuilder();
 		results.foreach(trackChange => stringBuilder.append(toHtmlLink(
 		        trackChange, YoutubeVideoLinkFinder.getFirstUrlOfSearchTerm(trackChange.track.toString)) + "\n"));
@@ -124,8 +91,8 @@ class BillboardsHot100(urlString: String) {
 		val emailList = getEmailList();
 		emailList.foreach(email => sendEmailTo(email, resultsString));
 	}
-	private def filterResults(changes: List[TrackChange]): List[TrackChange] = {
-			changes.filter(track => track.oldPosition == (-1));
+	private def filterResults(changes: List[TrackListing]): List[TrackListing] = {
+			changes.filter(track => true);//track.oldPosition == (-1));
 	}
 	/**
 	 * Sends email through sendgrid.
@@ -153,45 +120,32 @@ class BillboardsHot100(urlString: String) {
 	 * Reads email list from EMAILS_PATH and converts it into a List[String]
 	 */
 	private def getEmailList(): List[String] = {
-			try {
-				val file = new File(PATH + EMAILS_FILE_NAME);
-				val in = new Scanner(file);
-				val emailList = new ListBuffer[String]();
-				while(in.hasNextLine()) {
-					emailList.append(in.nextLine());
-				}
-				emailList.toList;
-			}
-			catch {
-				case e: FileNotFoundException => {Logger.error(e.getMessage()); List[String]()}
-				case e: Exception => {Logger.error(e.getStackTrace().mkString("\n")); null;}
-			}
+	  val emails = BillboardsDatabase.getEmails().filter(email => email.active);
+	  val list = new ListBuffer[String]();
+	  emails.foreach(email => list.append(email.emailAddress));
+	  list.toList;
 	}
 	/**
 	 * Compares two track lists and returns the differences
 	 */
-	private def compareTrackLists(oldTrackList: Array[Track], newTrackList: Array[Track]): List[TrackChange] = {
-		val list: ListBuffer[TrackChange] = new ListBuffer[TrackChange]();
-		for(i <- 1 to 100) {
-			val oldTrackIndex = oldTrackList.indexOf(newTrackList(i));
-			if( Option(newTrackList(i)).isDefined &&  oldTrackIndex != i) {
-				list += new TrackChange(oldTrackIndex, i, newTrackList(i));
-			}
-		}
-		return list.toList;
+	private def compareTrackListings(oldTrackListings: List[TrackListing], newTrackListings: List[TrackListing]): List[TrackListing] = {
+		val list: ListBuffer[TrackListing] = new ListBuffer[TrackListing]();
+		newTrackListings.filter(newListing => oldTrackListings.filter(oldListing => newListing.track.equals(oldListing.track) ).isEmpty );
 	}
 	/**
 	 * Makes track object from XML Node and adds it to array.
 	 */
-	private def makeTrack(node: Node,arr: Array[Track]): Track = {
-		val str: String = (node \ "title").toString();;
-		val trackStringArr: Array[String] = str.replaceAll("</?title>","").split("[:,]");
-		val track: Track = new Track(trackStringArr(1).trim(), trackStringArr(2).trim());
-		arr(trackStringArr(0).toInt) = track;
-		return track;
+	private def makeTrackListing(node: Node): TrackListing = {
+		val title = (node \ "title");;
+		val pubDate = node \ "pubDate";
+		val date = new SimpleDateFormat("EEE, dd MMM yyyy HH:mm:ss zzz",Locale.US).parse(pubDate.text); 
+		val trackStringArr: Array[String] = title.text.split("[:,]");
+		val track: Track =  Track(trackStringArr(1).replace("&amp;", "&").trim(), trackStringArr(2).replace("&amp;", "&").trim());
+		val trackListing: TrackListing = TrackListing(trackStringArr(0).toInt, track, new java.sql.Date(date.getTime()));
+		return trackListing;
 	}
-	private def toHtmlLink(trackChange: TrackChange, link: String):String = {
-	  "<a href=\""+ link + "\" target=\"_blank\" style=\"target-new: tab;\">" + trackChange.newPosition + ". " + trackChange.track.toString() + "</a><br>" 
+	private def toHtmlLink(trackListing: TrackListing, link: String):String = {
+	  "<a href=\""+ link + "\" target=\"_blank\" style=\"target-new: tab;\">" + trackListing.position + ". " + trackListing.track.toString() + "</a><br>" 
 	}
 }
 

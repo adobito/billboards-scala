@@ -4,12 +4,11 @@
 	<classpathentry kind="con" path="org.scala-ide.sdt.launching.SCALA_CONTAINER"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER/org.eclipse.jdt.internal.debug.ui.launcher.StandardVMType/JavaSE-1.7"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/sendgrid-0.1.2-jar.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/scala-pickling_2.10-0.8.0-SNAPSHOT.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/scala-library.jar"/>
-	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/scala-reflect.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/guava-15.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/gdata/java/lib/gdata-youtube-2.0.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/javamail-1.4.7/mail.jar"/>
 	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/jaf-1.1.1/activation.jar"/>
+	<classpathentry kind="lib" path="C:/Users/Zaiber/Downloads/mysql-connector-java-5.1.28/mysql-connector-java-5.1.28/mysql-connector-java-5.1.28-bin.jar"/>
 	<classpathentry kind="output" path="bin"/>
 </classpath>

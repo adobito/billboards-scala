@@ -1,6 +1,4 @@
 /bin
 /eMails.txt
 /oldTrackList.txt
-/bin
-/log.txt
-/oldTrackList.txt.bak
+/.cache

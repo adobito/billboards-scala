@@ -8,13 +8,17 @@ import java.io.BufferedWriter
 import java.util.Date
 
 object Logger {
-  private final val PATH = PathFinder.getPath;
+	private final val PATH = PathFinder.getPath;
 	private final val FILENAME = "log.txt";
 	private final val FILE = new File(PATH + FILENAME);
 	private final val WRITER = new BufferedWriter(new FileWriter(FILE,true));
+	private var printlineEnabled = false;
 
 	private def printToFile(message: String) {
 		WRITER.append(new Date() + " " +  message +"\r\n");
+		if(printlineEnabled)  {
+			println(message);
+		}
 		WRITER.flush();
 	}
 	def error(message: String) {
@@ -28,5 +32,11 @@ object Logger {
 	}
 	def warning(message: String) {
 		printToFile("WARNING: " + message);
+	}
+	def enablePrintln() {
+		printlineEnabled = true;
+	}
+	def disablePrintln() {
+		printlineEnabled = false;
 	}
 }

@@ -1,10 +1,12 @@
 package com.jluzon.billboards.objects
 
-case class TrackChange(oldPosition: Int, newPosition: Int,track: Track) {
+import java.sql.Date
+
+case class TrackListing(position: Int,track: Track, date: Date) {
 	//	def getOldPosition = oldPosition;
 	//	def getNewPosition = newPosition;
 	//	def getTrack = track;
 	//	def getPositionChange = oldPosition - newPosition;
-	override def toString() = 
-			"Old: " + oldPosition + " New: " + newPosition + " - " + track;
+//	override def toString() = 
+//			"Old: " + oldPosition + " New: " + newPosition + " - " + track;
 }
